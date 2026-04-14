@@ -1,5 +1,20 @@
-.DS_Store
-node_modules/
+# Secretos
 .env
+*.pem
+*.key
+.env.worker
+# Logs de Airflow
+airflow/logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Sistema
+.DS_Store
+.idea/
+.vscode/
 *.log
 docker-data/
+.env.worker

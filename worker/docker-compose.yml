@@ -1,14 +1,18 @@
-version: "3.9"
-
 services:
 
   airflow-worker:
-    image: apache/airflow:2.9.0-python3.12
+    image: apache/airflow:3.2.0
+    container_name: airflow_worker
+    command: celery worker
+    restart: always
     env_file:
-      - ../.env
+      - ../.env.worker
     volumes:
       - ../airflow/dags:/opt/airflow/dags
       - ../airflow/logs:/opt/airflow/logs
       - ../airflow/plugins:/opt/airflow/plugins
-    command: celery worker
-    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "airflow celery worker --help > /dev/null 2>&1"]
+      interval: 30s
+      retries: 5
+      start_period: 30s
