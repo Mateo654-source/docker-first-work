@@ -1,0 +1,61 @@
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:3.2.0-python3.12
+  env_file:
+    - ../.env
+  volumes:
+    - ../airflow/dags:/opt/airflow/dags
+    - ../airflow/logs:/opt/airflow/logs
+    - ../airflow/plugins:/opt/airflow/plugins
+  networks:
+    - airflow-net
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: always
+    env_file:
+      - ../.env
+    ports:
+      - "15672:15672"  # solo admin
+    networks:
+      - airflow-net
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      airflow db upgrade &&
+      airflow users create
+      --username admin
+      --password admin
+      --firstname admin
+      --lastname admin
+      --role Admin
+      --email admin@admin.com
+      "
+    depends_on:
+      - rabbitmq
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: always
+    depends_on:
+      - rabbitmq
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: always
+    depends_on:
+      - rabbitmq
+
+
+networks:
+  airflow-net:
+    driver: bridge
