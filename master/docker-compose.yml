@@ -1,5 +1,5 @@
 x-airflow-common: &airflow-common
-  image: apache/airflow:3.2.0
+  image: apache/airflow:3.2.0-python3.12
   env_file:
     - ../.env
   volumes:
@@ -27,7 +27,8 @@ services:
       interval: 10s
       retries: 5
       start_period: 10s
-
+    ports:
+      - "5432:5432"
   rabbitmq:
     image: rabbitmq:3.12-management
     container_name: airflow_rabbitmq
@@ -44,7 +45,8 @@ services:
       interval: 15s
       retries: 5
       start_period: 20s
-airflow-init:
+
+  airflow-init:
     <<: *airflow-common
     container_name: airflow_init
     entrypoint: /bin/bash
@@ -52,7 +54,7 @@ airflow-init:
       - -c
       - |
         airflow db migrate &&
-        airflow auth manager create-user \
+        airflow users create \
           --username ${AIRFLOW_ADMIN_USER} \
           --password ${AIRFLOW_ADMIN_PASSWORD} \
           --firstname ${AIRFLOW_ADMIN_FIRSTNAME} \
@@ -64,7 +66,7 @@ airflow-init:
   airflow-webserver:
     <<: *airflow-common
     container_name: airflow_webserver
-    command: webserver
+    command: airflow api-server
     restart: always
     ports:
       - "8080:8080"
@@ -77,15 +79,26 @@ airflow-init:
   airflow-scheduler:
     <<: *airflow-common
     container_name: airflow_scheduler
-    command: scheduler
+    command: airflow scheduler
     restart: always
 
   flower:
     <<: *airflow-common
     container_name: airflow_flower
-    command: celery flower
+    command: airflow celery flower
     restart: always
     ports:
       - "5555:5555"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5555/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 volumes:
   postgres_data:

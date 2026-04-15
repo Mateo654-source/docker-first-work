@@ -3,7 +3,7 @@ services:
   airflow-worker:
     image: apache/airflow:3.2.0
     container_name: airflow_worker
-    command: celery worker
+    command: airflow celery worker
     restart: always
     env_file:
       - ../.env.worker
@@ -11,6 +11,12 @@ services:
       - ../airflow/dags:/opt/airflow/dags
       - ../airflow/logs:/opt/airflow/logs
       - ../airflow/plugins:/opt/airflow/plugins
+    deploy:
+      resources:
+        limits:
+          memory: 1024M       
+        reservations:
+          memory: 512M        
     healthcheck:
       test: ["CMD-SHELL", "airflow celery worker --help > /dev/null 2>&1"]
       interval: 30s
