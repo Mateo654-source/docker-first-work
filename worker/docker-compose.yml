@@ -1,12 +1,15 @@
 services:
 
   airflow-worker:
-    image: apache/airflow:3.2.0
+    image: apache/airflow:3.2.0-python3.12
     container_name: airflow_worker
     command: airflow celery worker
     restart: always
     env_file:
       - ../.env.worker
+    depends_on:
+      - rabbitmq
+      - airflow_postgres 
     volumes:
       - ../airflow/dags:/opt/airflow/dags
       - ../airflow/logs:/opt/airflow/logs
