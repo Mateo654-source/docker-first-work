@@ -14,6 +14,7 @@ x-airflow-common: &airflow-common
 
 services:
 
+  # ── POSTGRES ────────────────────────────────────────────
   postgres:
     image: postgres:15
     container_name: airflow_postgres
@@ -29,6 +30,8 @@ services:
       start_period: 10s
     ports:
       - "5432:5432"
+
+  # ── RABBITMQ ────────────────────────────────────────────
   rabbitmq:
     image: rabbitmq:3.12-management
     container_name: airflow_rabbitmq
@@ -46,6 +49,7 @@ services:
       retries: 5
       start_period: 20s
 
+  # ── INIT ────────────────────────────────────────────────
   airflow-init:
     <<: *airflow-common
     container_name: airflow_init
@@ -53,35 +57,55 @@ services:
     command:
       - -c
       - |
-        airflow db migrate &&
-        airflow users create \
-          --username ${AIRFLOW_ADMIN_USER} \
-          --password ${AIRFLOW_ADMIN_PASSWORD} \
-          --firstname ${AIRFLOW_ADMIN_FIRSTNAME} \
-          --lastname ${AIRFLOW_ADMIN_LASTNAME} \
-          --role ${AIRFLOW_ADMIN_ROLE} \
-          --email ${AIRFLOW_ADMIN_EMAIL}
-    restart: on-failure
+        airflow db migrate
+     restart: on-failure
 
-  airflow-webserver:
+  # ── DAG PROCESSOR ───────────────────────────────────────
+  dag-processor:
     <<: *airflow-common
-    container_name: airflow_webserver
-    command: airflow api-server
+    container_name: airflow_dag
+    command: airflow dag-processor
     restart: always
-    ports:
-      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      test: ["CMD-SHELL", "airflow jobs check --job-type DagProcessorJob --hostname $(hostname)"]
       interval: 30s
+      timeout: 10s
       retries: 5
-      start_period: 30s
 
+  # ── SCHEDULER ───────────────────────────────────────────
   airflow-scheduler:
     <<: *airflow-common
     container_name: airflow_scheduler
     command: airflow scheduler
     restart: always
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
 
+  # ── API / WEBSERVER ─────────────────────────────────────
+  airflow-api-server:
+    <<: *airflow-common
+    container_name: airflow_api
+    command: api-server
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 30s
+      retries: 5
+      start_period: 30s
+  # ── FLOWER ──────────────────────────────────────────────
   flower:
     <<: *airflow-common
     container_name: airflow_flower
@@ -89,6 +113,9 @@ services:
     restart: always
     ports:
       - "5555:5555"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
@@ -100,5 +127,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+
 volumes:
   postgres_data:
