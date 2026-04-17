@@ -11,6 +11,8 @@ services:
       - ../airflow/dags:/opt/airflow/dags
       - ../airflow/logs:/opt/airflow/logs
       - ../airflow/plugins:/opt/airflow/plugins
+    ports:
+      - "8793:8793"
     deploy:
       resources:
         limits:
